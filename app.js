@@ -3,10 +3,19 @@ const SUPABASE_URL = "https://nfyutrshudnmkvcscobc.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_It99CB_ttgCo-ZEwiOR1gQ_y8eNkjwJ";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 const defaultCategories = ["School", "Work", "Personal", "Errands"];
+const DEFAULT_SETTINGS = {
+  accent: "#5267d8",
+  event: "#c66c49",
+  hardDue: "#c24b4b",
+  background: "#f1f3f6",
+  density: "comfortable",
+};
 
 const state = {
   items: [],
   user: null,
+  settings: { ...DEFAULT_SETTINGS },
+  notifications: [],
   currentMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
   selectedDate: formatDate(new Date()),
   activeTab: "task",
@@ -20,6 +29,27 @@ const els = {
   authMessage: document.querySelector("#authMessage"),
   userEmail: document.querySelector("#userEmail"),
   signOutButton: document.querySelector("#signOutButton"),
+  settingsButton: document.querySelector("#settingsButton"),
+  settingsModal: document.querySelector("#settingsModal"),
+  settingsForm: document.querySelector("#settingsForm"),
+  settingAccent: document.querySelector("#settingAccent"),
+  settingEvent: document.querySelector("#settingEvent"),
+  settingHardDue: document.querySelector("#settingHardDue"),
+  settingBackground: document.querySelector("#settingBackground"),
+  settingDensity: document.querySelector("#settingDensity"),
+  editModal: document.querySelector("#editModal"),
+  editTaskForm: document.querySelector("#editTaskForm"),
+  editTaskId: document.querySelector("#editTaskId"),
+  editTaskTitle: document.querySelector("#editTaskTitle"),
+  editTaskNotes: document.querySelector("#editTaskNotes"),
+  editTaskCategory: document.querySelector("#editTaskCategory"),
+  editTaskPriority: document.querySelector("#editTaskPriority"),
+  editTaskDate: document.querySelector("#editTaskDate"),
+  editTaskSoftDueDate: document.querySelector("#editTaskSoftDueDate"),
+  editTaskHardDueDate: document.querySelector("#editTaskHardDueDate"),
+  notificationArea: document.querySelector("#notificationArea"),
+  todayList: document.querySelector("#todayList"),
+  todayCount: document.querySelector("#todayCount"),
   taskForm: document.querySelector("#taskForm"),
   eventForm: document.querySelector("#eventForm"),
   taskTitle: document.querySelector("#taskTitle"),
@@ -59,11 +89,13 @@ function toCloudRow(item) {
     notes: item.notes || "",
     category: item.category || "General",
     date: item.date || null,
+    soft_due_date: item.softDueDate || null,
     hard_due_date: item.hardDueDate || null,
     time: item.time || null,
     recurrence: item.recurrence || "none",
     recurrence_end_date: item.recurrenceEndDate || null,
     completed: Boolean(item.completed),
+    priority: item.priority || "normal",
     created_at: item.createdAt || Date.now(),
   };
 }
@@ -76,11 +108,13 @@ function fromCloudRow(row) {
     notes: row.notes || "",
     category: row.category || "General",
     date: row.date || "",
+    softDueDate: row.soft_due_date || "",
     hardDueDate: row.hard_due_date || "",
     time: row.time || "",
     recurrence: row.recurrence || "none",
     recurrenceEndDate: row.recurrence_end_date || "",
     completed: Boolean(row.completed),
+    priority: row.priority || "normal",
     createdAt: Number(row.created_at) || Date.now(),
   };
 }
@@ -116,6 +150,47 @@ async function loadCloudItems(user) {
   saveItemsLocally();
 }
 
+function normalizeSettings(settings) {
+  return { ...DEFAULT_SETTINGS, ...(settings || {}) };
+}
+
+function applySettings() {
+  document.documentElement.style.setProperty("--accent", state.settings.accent);
+  document.documentElement.style.setProperty("--accent-soft", `${state.settings.accent}18`);
+  document.documentElement.style.setProperty("--event", state.settings.event);
+  document.documentElement.style.setProperty("--hard-due", state.settings.hardDue);
+  document.documentElement.style.setProperty("--page-background", state.settings.background);
+  document.body.classList.toggle("compact-calendar", state.settings.density === "compact");
+}
+
+function addDays(date, amount) {
+  const result = new Date(date);
+  result.setDate(result.getDate() + amount);
+  return result;
+}
+
+function raisePriority(priority) {
+  if (priority === "low") return "normal";
+  return "high";
+}
+
+function processSoftDueRollovers() {
+  const today = formatDate(new Date());
+  const tomorrow = formatDate(addDays(new Date(), 1));
+  const movedTasks = [];
+  state.items.forEach((item) => {
+    if (item.type !== "task" || item.completed || !item.softDueDate || item.softDueDate >= today) return;
+    item.softDueDate = tomorrow;
+    item.priority = raisePriority(item.priority || "normal");
+    movedTasks.push(item.title);
+  });
+  if (movedTasks.length) {
+    state.notifications = movedTasks;
+    return true;
+  }
+  return false;
+}
+
 function setAuthMessage(message, isError = false) {
   els.authMessage.textContent = message;
   els.authMessage.classList.toggle("error", isError);
@@ -123,11 +198,14 @@ function setAuthMessage(message, isError = false) {
 
 async function showSignedInApp(session) {
   state.user = session.user;
+  state.settings = normalizeSettings(session.user.user_metadata?.planner_settings);
+  applySettings();
   els.userEmail.textContent = session.user.email || "Signed in";
   els.authGate.classList.add("hidden");
   els.appShell.classList.remove("hidden");
   try {
     await loadCloudItems(session.user);
+    if (processSoftDueRollovers()) await saveItems();
     renderAll();
   } catch (error) {
     console.error(error);
@@ -185,6 +263,113 @@ function renderCategoryControls() {
   els.categoryOptions.innerHTML = categories.map((category) => `<option value="${escapeHtml(category)}"></option>`).join("");
 }
 
+function validTaskDates(planDate, softDueDate, hardDueDate) {
+  if (planDate && softDueDate && planDate > softDueDate) {
+    alert("The soft due date should be on or after the planned work date.");
+    return false;
+  }
+  if (softDueDate && hardDueDate && softDueDate > hardDueDate) {
+    alert("The hard due date should be on or after the soft due date.");
+    return false;
+  }
+  if (planDate && hardDueDate && planDate > hardDueDate) {
+    alert("The hard due date should be on or after the planned work date.");
+    return false;
+  }
+  return true;
+}
+
+function openEditModal(task) {
+  els.editTaskId.value = task.id;
+  els.editTaskTitle.value = task.title || "";
+  els.editTaskNotes.value = task.notes || "";
+  els.editTaskCategory.value = task.category || "General";
+  els.editTaskPriority.value = task.priority || "normal";
+  els.editTaskDate.value = task.date || "";
+  els.editTaskSoftDueDate.value = task.softDueDate || "";
+  els.editTaskHardDueDate.value = task.hardDueDate || "";
+  els.editModal.classList.remove("hidden");
+}
+
+function closeModal(id) {
+  document.querySelector(`#${id}`).classList.add("hidden");
+}
+
+function renderNotifications() {
+  if (!state.notifications.length) {
+    els.notificationArea.classList.add("hidden");
+    els.notificationArea.textContent = "";
+    return;
+  }
+  const names = state.notifications.slice(0, 3).map((title) => `“${title}”`).join(", ");
+  const extra = state.notifications.length > 3 ? ` and ${state.notifications.length - 3} more` : "";
+  els.notificationArea.textContent = `Soft due dates passed for ${names}${extra}. They were moved to tomorrow and priority was raised.`;
+  els.notificationArea.classList.remove("hidden");
+}
+
+function todayEntries() {
+  const today = formatDate(new Date());
+  const entries = [];
+  state.items.forEach((item) => {
+    if (item.type === "event" && eventOccursOnDate(item, today)) {
+      entries.push({ item, kind: item.time ? formatTime(item.time) : "Event", rank: 0 });
+      return;
+    }
+    if (item.type !== "task") return;
+    const labels = [];
+    if (item.date === today) labels.push("Plan today");
+    if (item.softDueDate === today) labels.push("Soft due");
+    if (item.hardDueDate === today) labels.push("Hard due");
+    if (labels.length) entries.push({ item, kind: labels.join(" · "), rank: item.priority === "high" ? 1 : 2 });
+  });
+  return entries.sort((a, b) => a.rank - b.rank || (a.item.time || "99:99").localeCompare(b.item.time || "99:99"));
+}
+
+function renderTodayList() {
+  const entries = todayEntries();
+  els.todayCount.textContent = entries.filter((entry) => entry.item.type === "event" || !entry.item.completed).length;
+  els.todayList.innerHTML = "";
+  if (!entries.length) {
+    els.todayList.innerHTML = `<div class="today-empty">Nothing scheduled for today.</div>`;
+    return;
+  }
+  entries.forEach(({ item, kind }) => {
+    const row = document.createElement("div");
+    row.className = `today-item${item.completed ? " done" : ""}`;
+    if (item.type === "task") {
+      const check = document.createElement("button");
+      check.className = `today-check${item.completed ? " done" : ""}`;
+      check.setAttribute("aria-label", item.completed ? "Mark task incomplete" : "Mark task complete");
+      check.addEventListener("click", () => {
+        item.completed = !item.completed;
+        void saveItems();
+        renderAll();
+      });
+      row.appendChild(check);
+    } else {
+      const dot = document.createElement("span");
+      dot.className = "legend-dot event-dot";
+      row.appendChild(dot);
+    }
+    const title = document.createElement("span");
+    title.className = "today-item-title";
+    title.textContent = item.title;
+    row.appendChild(title);
+    const kindLabel = document.createElement("span");
+    kindLabel.className = "today-kind";
+    kindLabel.textContent = kind;
+    row.appendChild(kindLabel);
+    if (item.type === "task") {
+      const edit = document.createElement("button");
+      edit.className = "edit-button";
+      edit.textContent = "Edit";
+      edit.addEventListener("click", () => openEditModal(item));
+      row.appendChild(edit);
+    }
+    els.todayList.appendChild(row);
+  });
+}
+
 function renderTasks() {
   const filter = els.categoryFilter.value || "all";
   const tasks = state.items
@@ -204,13 +389,16 @@ function renderTasks() {
     const item = node.querySelector(".task-item");
     const check = node.querySelector(".check-button");
     const title = node.querySelector(".task-title");
+    const editButton = node.querySelector(".edit-button");
     const category = node.querySelector(".category-pill");
     const schedule = node.querySelector(".task-schedule");
+    const priorityBadge = node.querySelector(".priority-badge");
     const hardDueBadge = node.querySelector(".hard-due-badge");
     const notes = node.querySelector(".task-notes");
     const deleteButton = node.querySelector(".delete-button");
     const scheduleControl = node.querySelector(".schedule-control");
     const planDateInput = node.querySelector(".plan-date-input");
+    const softDateInput = node.querySelector(".soft-date-input");
     const hardDateInput = node.querySelector(".hard-date-input");
     const saveButton = node.querySelector(".small-button");
 
@@ -222,7 +410,10 @@ function renderTasks() {
     schedule.textContent = task.date ? readableDate(task.date) : "Unscheduled";
     if (!task.date) schedule.classList.add("unscheduled");
     planDateInput.value = task.date || "";
+    softDateInput.value = task.softDueDate || "";
     hardDateInput.value = task.hardDueDate || "";
+    priorityBadge.textContent = task.priority || "normal";
+    priorityBadge.className = `priority-badge ${task.priority || "normal"}`;
     if (task.hardDueDate) {
       hardDueBadge.textContent = `Hard: ${readableDate(task.hardDueDate)}`;
       hardDueBadge.classList.remove("hidden");
@@ -232,22 +423,23 @@ function renderTasks() {
       notes.classList.remove("hidden");
     }
 
-    if (!task.date || !task.hardDueDate) {
+    if (!task.date || !task.softDueDate || !task.hardDueDate) {
       scheduleControl.classList.remove("hidden");
       saveButton.addEventListener("click", () => {
-        if (planDateInput.value && hardDateInput.value && planDateInput.value > hardDateInput.value) {
-          alert("The hard due date should be on or after the planned work date.");
+        if (!validTaskDates(planDateInput.value, softDateInput.value, hardDateInput.value)) {
           return;
         }
         task.date = planDateInput.value;
+        task.softDueDate = softDateInput.value;
         task.hardDueDate = hardDateInput.value;
-        saveItems();
+        void saveItems();
         renderAll();
       });
     }
+    editButton.addEventListener("click", () => openEditModal(task));
     check.addEventListener("click", () => {
       task.completed = !task.completed;
-      saveItems();
+      void saveItems();
       renderAll();
     });
     deleteButton.addEventListener("click", () => {
@@ -338,10 +530,8 @@ function renderCalendar() {
       itemButton.addEventListener("click", (event) => {
         event.stopPropagation();
         state.selectedDate = date;
-        if (item.calendarKind === "task") {
-          item.completed = !item.completed;
-          saveItems();
-        }
+        const sourceItem = state.items.find((source) => source.id === item.id);
+        if (sourceItem && sourceItem.type === "task") openEditModal(sourceItem);
         renderAll();
       });
       cell.appendChild(itemButton);
@@ -390,6 +580,8 @@ function renderAll() {
   renderCategoryControls();
   renderTasks();
   renderCalendar();
+  renderNotifications();
+  renderTodayList();
 }
 
 document.querySelectorAll(".tab").forEach((tab) => {
@@ -405,15 +597,14 @@ els.taskForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const formData = new FormData(els.taskForm);
   const planDate = formData.get("date") || "";
+  const softDueDate = formData.get("softDueDate") || "";
   const hardDueDate = formData.get("hardDueDate") || "";
-  if (planDate && hardDueDate && planDate > hardDueDate) {
-    alert("The hard due date should be on or after the planned work date.");
-    return;
-  }
+  if (!validTaskDates(planDate, softDueDate, hardDueDate)) return;
   state.items.push({
     id: makeId("task"), type: "task", title: formData.get("title").trim(),
     notes: formData.get("notes").trim(), category: formData.get("category").trim() || "General",
-    date: planDate, hardDueDate,
+    date: planDate, softDueDate, hardDueDate,
+    priority: formData.get("priority") || "normal",
     completed: false, createdAt: Date.now(),
   });
   saveItems();
@@ -434,6 +625,61 @@ els.eventForm.addEventListener("submit", (event) => {
   saveItems();
   resetForm(els.eventForm);
   renderAll();
+});
+
+els.editTaskForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const task = state.items.find((item) => item.id === els.editTaskId.value);
+  if (!task) return;
+  const planDate = els.editTaskDate.value;
+  const softDueDate = els.editTaskSoftDueDate.value;
+  const hardDueDate = els.editTaskHardDueDate.value;
+  if (!validTaskDates(planDate, softDueDate, hardDueDate)) return;
+  task.title = els.editTaskTitle.value.trim();
+  task.notes = els.editTaskNotes.value.trim();
+  task.category = els.editTaskCategory.value.trim() || "General";
+  task.priority = els.editTaskPriority.value;
+  task.date = planDate;
+  task.softDueDate = softDueDate;
+  task.hardDueDate = hardDueDate;
+  void saveItems();
+  closeModal("editModal");
+  renderAll();
+});
+
+els.settingsButton.addEventListener("click", () => {
+  els.settingAccent.value = state.settings.accent;
+  els.settingEvent.value = state.settings.event;
+  els.settingHardDue.value = state.settings.hardDue;
+  els.settingBackground.value = state.settings.background;
+  els.settingDensity.value = state.settings.density;
+  els.settingsModal.classList.remove("hidden");
+});
+
+els.settingsForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  state.settings = normalizeSettings({
+    accent: els.settingAccent.value,
+    event: els.settingEvent.value,
+    hardDue: els.settingHardDue.value,
+    background: els.settingBackground.value,
+    density: els.settingDensity.value,
+  });
+  applySettings();
+  const { error } = await supabaseClient.auth.updateUser({ data: { planner_settings: state.settings } });
+  if (error) console.error("Could not save planner settings:", error.message);
+  closeModal("settingsModal");
+  renderAll();
+});
+
+document.querySelectorAll("[data-close-modal]").forEach((button) => {
+  button.addEventListener("click", () => closeModal(button.dataset.closeModal));
+});
+
+document.querySelectorAll(".modal").forEach((modal) => {
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) modal.classList.add("hidden");
+  });
 });
 
 els.categoryFilter.addEventListener("change", renderTasks);
@@ -486,3 +732,11 @@ supabaseClient.auth.onAuthStateChange((_event, session) => {
   if (data.session) await showSignedInApp(data.session);
   else showSignedOutApp();
 })();
+
+setInterval(async () => {
+  if (!state.user) return;
+  if (processSoftDueRollovers()) {
+    await saveItems();
+    renderAll();
+  }
+}, 60000);
