@@ -108,6 +108,38 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .today-item.done .today-item-title { color: var(--muted); text-decoration: line-through; }
 .today-kind { color: var(--muted); font-size: 10px; }
 
+.progress-card { padding: 18px 21px; }
+.progress-week-label { margin: 7px 0 14px; color: var(--muted); font-size: 11px; }
+.progress-visual-wrap { display: grid; min-height: 164px; place-items: center; }
+.progress-ring { --progress: 0%; position: relative; display: grid; width: 146px; height: 146px; place-items: center; border-radius: 50%; background: conic-gradient(var(--accent) var(--progress), #edf0f4 0); transition: background .45s ease; }
+.progress-ring::before { position: absolute; inset: 11px; border-radius: 50%; background: white; content: ""; }
+.progress-ring-content { position: relative; display: grid; gap: 1px; text-align: center; }
+.progress-ring-content strong { font-size: 28px; letter-spacing: -.05em; }
+.progress-ring-content span, .beer-copy span { color: var(--muted); font-size: 11px; }
+.progress-message { min-height: 17px; margin: 12px 0 0; color: var(--muted); font-size: 11px; text-align: center; }
+.beer-progress { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 17px; }
+.beer-can { position: relative; width: 91px; height: 151px; overflow: hidden; border: 3px solid #b8bec8; border-radius: 13px 13px 17px 17px; background: linear-gradient(105deg, #dfe4eb, #f9fafc 42%, #bfc6d0); box-shadow: inset -8px 0 10px rgba(76, 84, 99, .13), 0 5px 10px rgba(33, 38, 53, .12); transition: transform .55s ease, border-radius .55s ease, height .55s ease; }
+.beer-can::before { position: absolute; z-index: 2; top: 4px; left: 8px; right: 8px; height: 7px; border: 2px solid #aeb5c0; border-radius: 50%; background: #d8dde4; content: ""; }
+.beer-can::after { position: absolute; z-index: 4; right: 0; bottom: 10px; left: 0; color: rgba(38, 45, 58, .28); content: "✦"; font-size: 23px; text-align: center; }
+.beer-tab { position: absolute; z-index: 3; top: 5px; left: 34px; width: 20px; height: 8px; border: 2px solid #a4abb5; border-radius: 50%; background: #e9edf2; }
+.beer-liquid { position: absolute; right: 4px; bottom: 4px; left: 4px; height: var(--beer-remaining, 100%); min-height: 0; border-radius: 7px 7px 10px 10px; background: linear-gradient(90deg, #d88a21, #f5c251 45%, #cf7d1d); box-shadow: inset 0 3px 0 rgba(255, 245, 190, .75); transition: height .55s ease; }
+.beer-liquid::before { position: absolute; top: -5px; left: 3px; right: 3px; height: 8px; border-radius: 50%; background: #fff1bc; content: ""; }
+.beer-label { position: absolute; z-index: 3; top: 54px; right: 6px; left: 6px; border: 2px solid rgba(89, 58, 22, .34); border-radius: 6px; padding: 7px 2px; background: rgba(255, 231, 151, .88); color: #704516; font-size: 10px; font-weight: 900; line-height: 1.05; text-align: center; }
+.beer-copy { display: grid; gap: 4px; }
+.beer-copy strong { font-size: 19px; letter-spacing: -.03em; }
+.beer-can.crumpled { height: 116px; border-radius: 23% 34% 16% 30%; transform: rotate(-6deg) skewX(-4deg); }
+.beer-can.crumpled .beer-liquid { height: 0; }
+.beer-can.crumpled .beer-label { top: 38px; transform: rotate(4deg); }
+.settings-checkbox { display: flex; grid-template-columns: auto 1fr; align-items: center; gap: 7px; }
+.settings-checkbox input { width: auto; margin: 0; accent-color: var(--accent); }
+
+.completion-burst { position: fixed; z-index: 40; pointer-events: none; width: 0; height: 0; }
+.completion-particle { position: absolute; left: -6px; top: -6px; color: var(--accent); font-size: 18px; font-weight: 900; animation: completion-burst .72s cubic-bezier(.2,.8,.3,1) forwards; }
+@keyframes completion-burst {
+  0% { opacity: 1; transform: translate(0, 0) scale(.4) rotate(0deg); }
+  100% { opacity: 0; transform: translate(var(--x), var(--y)) scale(1.15) rotate(180deg); }
+}
+
 .modal { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 18px; background: rgba(28, 31, 40, .42); }
 .modal-card { display: grid; width: min(100%, 480px); max-height: calc(100vh - 36px); gap: 13px; overflow: auto; padding: 22px; }
 .modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 2px; }

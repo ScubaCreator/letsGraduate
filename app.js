@@ -9,6 +9,9 @@ const DEFAULT_SETTINGS = {
   hardDue: "#c24b4b",
   background: "#f1f3f6",
   density: "comfortable",
+  progressEnabled: true,
+  progressStyle: "ring",
+  completionEffect: true,
 };
 
 const state = {
@@ -52,6 +55,19 @@ const els = {
   settingHardDue: document.querySelector("#settingHardDue"),
   settingBackground: document.querySelector("#settingBackground"),
   settingDensity: document.querySelector("#settingDensity"),
+  settingProgressEnabled: document.querySelector("#settingProgressEnabled"),
+  settingProgressStyle: document.querySelector("#settingProgressStyle"),
+  settingCompletionEffect: document.querySelector("#settingCompletionEffect"),
+  progressCard: document.querySelector("#progressCard"),
+  progressWeekLabel: document.querySelector("#progressWeekLabel"),
+  ringProgress: document.querySelector("#ringProgress"),
+  ringPercent: document.querySelector("#ringPercent"),
+  ringCount: document.querySelector("#ringCount"),
+  beerProgress: document.querySelector("#beerProgress"),
+  beerCan: document.querySelector("#beerCan"),
+  beerPercent: document.querySelector("#beerPercent"),
+  beerCount: document.querySelector("#beerCount"),
+  progressMessage: document.querySelector("#progressMessage"),
   editModal: document.querySelector("#editModal"),
   editTaskForm: document.querySelector("#editTaskForm"),
   editTaskId: document.querySelector("#editTaskId"),
@@ -270,6 +286,84 @@ function readableDate(value, options = { month: "short", day: "numeric" }) {
   return dateFromString(value).toLocaleDateString(undefined, options);
 }
 
+function currentWeekBounds() {
+  const today = new Date();
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay());
+  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+  return { start: formatDate(start), end: formatDate(end) };
+}
+
+function weeklyTaskProgress() {
+  const { start, end } = currentWeekBounds();
+  const tasks = state.items.filter((item) => item.type === "task" && item.date && item.date >= start && item.date <= end);
+  const completed = tasks.filter((task) => task.completed).length;
+  return { start, end, total: tasks.length, completed };
+}
+
+function renderWeeklyProgress() {
+  els.progressCard.classList.toggle("hidden", !state.settings.progressEnabled);
+  if (!state.settings.progressEnabled) return;
+
+  const { start, end, total, completed } = weeklyTaskProgress();
+  const percent = total ? Math.round((completed / total) * 100) : 0;
+  const remaining = Math.max(0, total - completed);
+  const remainingPercent = total ? Math.round((remaining / total) * 100) : 100;
+  const weekLabel = `${readableDate(start)} – ${readableDate(end)}`;
+
+  els.progressWeekLabel.textContent = `${weekLabel} · planned tasks`;
+  els.ringProgress.style.setProperty("--progress", `${percent}%`);
+  els.ringPercent.textContent = `${percent}%`;
+  els.ringCount.textContent = `${completed} of ${total} done`;
+  els.ringProgress.classList.toggle("hidden", state.settings.progressStyle !== "ring");
+  els.beerProgress.classList.toggle("hidden", state.settings.progressStyle !== "beer");
+  els.beerCan.style.setProperty("--beer-remaining", `${remainingPercent}%`);
+  els.beerCan.classList.toggle("crumpled", total > 0 && remaining === 0);
+  els.beerPercent.textContent = `${remainingPercent}% left`;
+  els.beerCount.textContent = `${completed} of ${total} done`;
+  els.beerCan.setAttribute("aria-label", `${remainingPercent}% of the week's planned tasks remain`);
+
+  if (!total) {
+    els.progressMessage.textContent = "Nothing planned this week yet.";
+  } else if (!remaining) {
+    els.progressMessage.textContent = "You cleared the week! 🎉";
+  } else {
+    els.progressMessage.textContent = `${remaining} task${remaining === 1 ? "" : "s"} left this week.`;
+  }
+}
+
+function triggerCompletionEffect(rect) {
+  if (!state.settings.completionEffect || !rect) return;
+  const burst = document.createElement("div");
+  burst.className = "completion-burst";
+  burst.style.left = `${rect.left + rect.width / 2}px`;
+  burst.style.top = `${rect.top + rect.height / 2}px`;
+  const colors = ["var(--accent)", "#e5a93d", "#61a878", "#c66c49"];
+  const symbols = ["✦", "•", "✓", "✧"];
+  for (let index = 0; index < 14; index += 1) {
+    const particle = document.createElement("span");
+    const angle = (Math.PI * 2 * index) / 14;
+    const distance = 22 + (index % 3) * 9;
+    particle.className = "completion-particle";
+    particle.textContent = symbols[index % symbols.length];
+    particle.style.setProperty("--x", `${Math.cos(angle) * distance}px`);
+    particle.style.setProperty("--y", `${Math.sin(angle) * distance}px`);
+    particle.style.color = colors[index % colors.length];
+    particle.style.animationDelay = `${(index % 4) * 18}ms`;
+    burst.appendChild(particle);
+  }
+  document.body.appendChild(burst);
+  window.setTimeout(() => burst.remove(), 900);
+}
+
+function toggleTaskCompletion(task, target) {
+  const wasCompleted = task.completed;
+  const rect = target?.getBoundingClientRect?.();
+  task.completed = !task.completed;
+  void saveItems();
+  renderAll();
+  if (!wasCompleted && task.completed) triggerCompletionEffect(rect);
+}
+
 function makeId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -349,11 +443,7 @@ function renderTodayList() {
       const check = document.createElement("button");
       check.className = `today-check${item.completed ? " done" : ""}`;
       check.setAttribute("aria-label", item.completed ? "Mark task incomplete" : "Mark task complete");
-      check.addEventListener("click", () => {
-        item.completed = !item.completed;
-        void saveItems();
-        renderAll();
-      });
+      check.addEventListener("click", (event) => toggleTaskCompletion(item, event.currentTarget));
       row.appendChild(check);
     } else {
       const dot = document.createElement("span");
@@ -443,11 +533,7 @@ function renderTasks() {
       });
     }
     editButton.addEventListener("click", () => openEditModal(task));
-    check.addEventListener("click", () => {
-      task.completed = !task.completed;
-      void saveItems();
-      renderAll();
-    });
+    check.addEventListener("click", (event) => toggleTaskCompletion(task, event.currentTarget));
     deleteButton.addEventListener("click", () => {
       state.items = state.items.filter((item) => item.id !== task.id);
       saveItemsLocally();
@@ -627,6 +713,7 @@ function renderAll() {
   renderTasks();
   renderCalendar();
   renderTodayList();
+  renderWeeklyProgress();
 }
 
 document.querySelectorAll(".tab").forEach((tab) => {
@@ -695,6 +782,9 @@ els.settingsButton.addEventListener("click", () => {
   els.settingHardDue.value = state.settings.hardDue;
   els.settingBackground.value = state.settings.background;
   els.settingDensity.value = state.settings.density;
+  els.settingProgressEnabled.checked = state.settings.progressEnabled;
+  els.settingProgressStyle.value = state.settings.progressStyle;
+  els.settingCompletionEffect.checked = state.settings.completionEffect;
   els.settingsModal.classList.remove("hidden");
 });
 
@@ -706,6 +796,9 @@ els.settingsForm.addEventListener("submit", async (event) => {
     hardDue: els.settingHardDue.value,
     background: els.settingBackground.value,
     density: els.settingDensity.value,
+    progressEnabled: els.settingProgressEnabled.checked,
+    progressStyle: els.settingProgressStyle.value,
+    completionEffect: els.settingCompletionEffect.checked,
   });
   applySettings();
   const { error } = await supabaseClient.auth.updateUser({ data: { planner_settings: state.settings } });
