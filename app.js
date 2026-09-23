@@ -15,7 +15,6 @@ const state = {
   items: [],
   user: null,
   settings: { ...DEFAULT_SETTINGS },
-  notifications: [],
   currentMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
   selectedDate: formatDate(new Date()),
   activeTab: "task",
@@ -61,9 +60,7 @@ const els = {
   editTaskCategory: document.querySelector("#editTaskCategory"),
   editTaskPriority: document.querySelector("#editTaskPriority"),
   editTaskDate: document.querySelector("#editTaskDate"),
-  editTaskSoftDueDate: document.querySelector("#editTaskSoftDueDate"),
   editTaskHardDueDate: document.querySelector("#editTaskHardDueDate"),
-  notificationArea: document.querySelector("#notificationArea"),
   todayList: document.querySelector("#todayList"),
   todayCount: document.querySelector("#todayCount"),
   taskForm: document.querySelector("#taskForm"),
@@ -105,7 +102,6 @@ function toCloudRow(item) {
     notes: item.notes || "",
     category: item.category || "General",
     date: item.date || null,
-    soft_due_date: item.softDueDate || null,
     hard_due_date: item.hardDueDate || null,
     time: item.time || null,
     recurrence: item.recurrence || "none",
@@ -124,7 +120,6 @@ function fromCloudRow(row) {
     notes: row.notes || "",
     category: row.category || "General",
     date: row.date || "",
-    softDueDate: row.soft_due_date || "",
     hardDueDate: row.hard_due_date || "",
     time: row.time || "",
     recurrence: row.recurrence || "none",
@@ -177,34 +172,6 @@ function applySettings() {
   document.documentElement.style.setProperty("--hard-due", state.settings.hardDue);
   document.documentElement.style.setProperty("--page-background", state.settings.background);
   document.body.classList.toggle("compact-calendar", state.settings.density === "compact");
-}
-
-function addDays(date, amount) {
-  const result = new Date(date);
-  result.setDate(result.getDate() + amount);
-  return result;
-}
-
-function raisePriority(priority) {
-  if (priority === "low") return "normal";
-  return "high";
-}
-
-function processSoftDueRollovers() {
-  const today = formatDate(new Date());
-  const tomorrow = formatDate(addDays(new Date(), 1));
-  const movedTasks = [];
-  state.items.forEach((item) => {
-    if (item.type !== "task" || item.completed || !item.softDueDate || item.softDueDate >= today) return;
-    item.softDueDate = tomorrow;
-    item.priority = raisePriority(item.priority || "normal");
-    movedTasks.push(item.title);
-  });
-  if (movedTasks.length) {
-    state.notifications = movedTasks;
-    return true;
-  }
-  return false;
 }
 
 function setAuthMessage(message, isError = false) {
@@ -265,7 +232,6 @@ async function showSignedInApp(session) {
   els.appShell.classList.remove("hidden");
   try {
     await loadCloudItems(session.user);
-    if (processSoftDueRollovers()) await saveItems();
     renderAll();
   } catch (error) {
     console.error(error);
@@ -328,15 +294,7 @@ function renderCategoryControls() {
   els.categoryOptions.innerHTML = categories.map((category) => `<option value="${escapeHtml(category)}"></option>`).join("");
 }
 
-function validTaskDates(planDate, softDueDate, hardDueDate) {
-  if (planDate && softDueDate && planDate > softDueDate) {
-    alert("The soft due date should be on or after the planned work date.");
-    return false;
-  }
-  if (softDueDate && hardDueDate && softDueDate > hardDueDate) {
-    alert("The hard due date should be on or after the soft due date.");
-    return false;
-  }
+function validTaskDates(planDate, hardDueDate) {
   if (planDate && hardDueDate && planDate > hardDueDate) {
     alert("The hard due date should be on or after the planned work date.");
     return false;
@@ -351,25 +309,12 @@ function openEditModal(task) {
   els.editTaskCategory.value = task.category || "General";
   els.editTaskPriority.value = task.priority || "normal";
   els.editTaskDate.value = task.date || "";
-  els.editTaskSoftDueDate.value = task.softDueDate || "";
   els.editTaskHardDueDate.value = task.hardDueDate || "";
   els.editModal.classList.remove("hidden");
 }
 
 function closeModal(id) {
   document.querySelector(`#${id}`).classList.add("hidden");
-}
-
-function renderNotifications() {
-  if (!state.notifications.length) {
-    els.notificationArea.classList.add("hidden");
-    els.notificationArea.textContent = "";
-    return;
-  }
-  const names = state.notifications.slice(0, 3).map((title) => `“${title}”`).join(", ");
-  const extra = state.notifications.length > 3 ? ` and ${state.notifications.length - 3} more` : "";
-  els.notificationArea.textContent = `Soft due dates passed for ${names}${extra}. They were moved to tomorrow and priority was raised.`;
-  els.notificationArea.classList.remove("hidden");
 }
 
 function todayEntries() {
@@ -383,7 +328,6 @@ function todayEntries() {
     if (item.type !== "task") return;
     const labels = [];
     if (item.date === today) labels.push("Plan today");
-    if (item.softDueDate === today) labels.push("Soft due");
     if (item.hardDueDate === today) labels.push("Hard due");
     if (labels.length) entries.push({ item, kind: labels.join(" · "), rank: item.priority === "high" ? 1 : 2 });
   });
@@ -463,7 +407,6 @@ function renderTasks() {
     const deleteButton = node.querySelector(".delete-button");
     const scheduleControl = node.querySelector(".schedule-control");
     const planDateInput = node.querySelector(".plan-date-input");
-    const softDateInput = node.querySelector(".soft-date-input");
     const hardDateInput = node.querySelector(".hard-date-input");
     const saveButton = node.querySelector(".small-button");
 
@@ -475,7 +418,6 @@ function renderTasks() {
     schedule.textContent = task.date ? readableDate(task.date) : "Unscheduled";
     if (!task.date) schedule.classList.add("unscheduled");
     planDateInput.value = task.date || "";
-    softDateInput.value = task.softDueDate || "";
     hardDateInput.value = task.hardDueDate || "";
     priorityBadge.textContent = task.priority || "normal";
     priorityBadge.className = `priority-badge ${task.priority || "normal"}`;
@@ -488,14 +430,13 @@ function renderTasks() {
       notes.classList.remove("hidden");
     }
 
-    if (!task.date || !task.softDueDate || !task.hardDueDate) {
+    if (!task.date || !task.hardDueDate) {
       scheduleControl.classList.remove("hidden");
       saveButton.addEventListener("click", () => {
-        if (!validTaskDates(planDateInput.value, softDateInput.value, hardDateInput.value)) {
+        if (!validTaskDates(planDateInput.value, hardDateInput.value)) {
           return;
         }
         task.date = planDateInput.value;
-        task.softDueDate = softDateInput.value;
         task.hardDueDate = hardDateInput.value;
         void saveItems();
         renderAll();
@@ -556,6 +497,19 @@ function eventOccursOnDate(event, date) {
   return false;
 }
 
+function clearDragHighlights() {
+  document.querySelectorAll(".day-cell.drag-over").forEach((cell) => cell.classList.remove("drag-over"));
+}
+
+function movePlannedTask(taskId, date) {
+  const task = state.items.find((item) => item.id === taskId && item.type === "task");
+  if (!task || !task.date || !validTaskDates(date, task.hardDueDate)) return;
+  task.date = date;
+  selectDate(date);
+  void saveItems();
+  renderAll();
+}
+
 function renderCalendar() {
   const month = state.currentMonth;
   els.monthLabel.textContent = month.toLocaleDateString(undefined, { month: "long", year: "numeric" });
@@ -585,6 +539,20 @@ function renderCalendar() {
     cell.setAttribute("role", "button");
     cell.setAttribute("aria-label", readableDate(date, { weekday: "long", month: "long", day: "numeric", year: "numeric" }));
     cell.innerHTML = `<span class="day-number">${cellDate.getDate()}</span>`;
+    cell.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+      cell.classList.add("drag-over");
+    });
+    cell.addEventListener("dragleave", (event) => {
+      if (!event.relatedTarget || !cell.contains(event.relatedTarget)) cell.classList.remove("drag-over");
+    });
+    cell.addEventListener("drop", (event) => {
+      event.preventDefault();
+      const taskId = event.dataTransfer?.getData("text/plain");
+      clearDragHighlights();
+      if (taskId) movePlannedTask(taskId, date);
+    });
     const dayItems = itemsForDate(date);
     const visibleItems = dayItems.slice(0, 3);
     visibleItems.forEach((item) => {
@@ -592,6 +560,19 @@ function renderCalendar() {
       itemButton.className = `calendar-item ${item.calendarKind}${item.completed ? " done" : ""}`;
       itemButton.title = item.calendarKind === "event" && item.notes ? `${item.title}: ${item.notes}` : item.calendarTitle;
       itemButton.innerHTML = `${item.calendarKind === "event" && item.time ? `<span class="item-time">${escapeHtml(formatTime(item.time))}</span>` : ""}${escapeHtml(item.calendarTitle)}`;
+      if (item.calendarKind === "task") {
+        itemButton.draggable = true;
+        itemButton.title = `${item.title} — drag to reschedule`;
+        itemButton.addEventListener("dragstart", (event) => {
+          event.dataTransfer?.setData("text/plain", item.id);
+          if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+          itemButton.classList.add("dragging");
+        });
+        itemButton.addEventListener("dragend", () => {
+          itemButton.classList.remove("dragging");
+          clearDragHighlights();
+        });
+      }
       itemButton.addEventListener("click", (event) => {
         event.stopPropagation();
         state.selectedDate = date;
@@ -616,7 +597,7 @@ function renderCalendar() {
     });
     els.calendarGrid.appendChild(cell);
   }
-  els.selectedDateMessage.innerHTML = `<strong>${readableDate(state.selectedDate, { weekday: "long", month: "long", day: "numeric" })}</strong> is selected. New items can be added from the left.`;
+  els.selectedDateMessage.innerHTML = `<strong>${readableDate(state.selectedDate, { weekday: "long", month: "long", day: "numeric" })}</strong> is selected. New items can be added from the left. Drag a planned task to another day to reschedule it.`;
 }
 
 function formatTime(time) {
@@ -645,7 +626,6 @@ function renderAll() {
   renderCategoryControls();
   renderTasks();
   renderCalendar();
-  renderNotifications();
   renderTodayList();
 }
 
@@ -662,13 +642,12 @@ els.taskForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const formData = new FormData(els.taskForm);
   const planDate = formData.get("date") || "";
-  const softDueDate = formData.get("softDueDate") || "";
   const hardDueDate = formData.get("hardDueDate") || "";
-  if (!validTaskDates(planDate, softDueDate, hardDueDate)) return;
+  if (!validTaskDates(planDate, hardDueDate)) return;
   state.items.push({
     id: makeId("task"), type: "task", title: formData.get("title").trim(),
     notes: formData.get("notes").trim(), category: formData.get("category").trim() || "General",
-    date: planDate, softDueDate, hardDueDate,
+    date: planDate, hardDueDate,
     priority: formData.get("priority") || "normal",
     completed: false, createdAt: Date.now(),
   });
@@ -697,15 +676,13 @@ els.editTaskForm.addEventListener("submit", (event) => {
   const task = state.items.find((item) => item.id === els.editTaskId.value);
   if (!task) return;
   const planDate = els.editTaskDate.value;
-  const softDueDate = els.editTaskSoftDueDate.value;
   const hardDueDate = els.editTaskHardDueDate.value;
-  if (!validTaskDates(planDate, softDueDate, hardDueDate)) return;
+  if (!validTaskDates(planDate, hardDueDate)) return;
   task.title = els.editTaskTitle.value.trim();
   task.notes = els.editTaskNotes.value.trim();
   task.category = els.editTaskCategory.value.trim() || "General";
   task.priority = els.editTaskPriority.value;
   task.date = planDate;
-  task.softDueDate = softDueDate;
   task.hardDueDate = hardDueDate;
   void saveItems();
   closeModal("editModal");
@@ -872,11 +849,3 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
   if (data.session && !state.passwordRecovery) await showSignedInApp(data.session);
   else showSignedOutApp();
 })();
-
-setInterval(async () => {
-  if (!state.user) return;
-  if (processSoftDueRollovers()) {
-    await saveItems();
-    renderAll();
-  }
-}, 60000);

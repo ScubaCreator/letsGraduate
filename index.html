@@ -69,8 +69,6 @@
         </div>
       </header>
 
-      <div id="notificationArea" class="notification-area hidden" role="status"></div>
-
       <section class="layout">
         <aside class="sidebar">
           <section class="card add-card">
@@ -108,8 +106,8 @@
               </div>
               <div class="form-row">
                 <label>
-                  Soft due <span class="muted">(planning target)</span>
-                  <input id="taskSoftDueDate" name="softDueDate" type="date" />
+                  Hard due <span class="muted">(optional)</span>
+                  <input id="taskHardDueDate" name="hardDueDate" type="date" />
                 </label>
                 <label>
                   Priority
@@ -120,12 +118,7 @@
                   </select>
                 </label>
               </div>
-              <label>
-                Hard due <span class="muted">(optional)</span>
-                <input id="taskHardDueDate" name="hardDueDate" type="date" />
-              </label>
               <button class="primary-button" type="submit">Add task</button>
-              <p class="form-help">Soft due helps pace the work; hard due is the actual deadline.</p>
             </form>
 
             <form id="eventForm" class="add-form hidden">
@@ -208,7 +201,7 @@
             <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
           </div>
           <div class="calendar-grid" id="calendarGrid"></div>
-          <div class="selected-date" id="selectedDateMessage">Select a day to add a task or event.</div>
+          <div class="selected-date" id="selectedDateMessage">Select a day to add a task or event. Drag a planned task to another day to reschedule it.</div>
         </section>
       </section>
     </main>
@@ -231,7 +224,6 @@
           <div class="task-notes hidden"></div>
           <div class="schedule-control hidden">
             <label>Plan <input class="plan-date-input" type="date" aria-label="Plan task date" /></label>
-            <label>Soft <input class="soft-date-input" type="date" aria-label="Soft due date" /></label>
             <label>Hard due <input class="hard-date-input" type="date" aria-label="Hard due date" /></label>
             <button class="small-button">Save</button>
           </div>
@@ -263,9 +255,8 @@
         </div>
         <div class="form-row">
           <label>Plan to do <input id="editTaskDate" type="date" /></label>
-          <label>Soft due <input id="editTaskSoftDueDate" type="date" /></label>
+          <label>Hard due <input id="editTaskHardDueDate" type="date" /></label>
         </div>
-        <label>Hard due <input id="editTaskHardDueDate" type="date" /></label>
         <div class="modal-actions">
           <button class="secondary-button" type="button" data-close-modal="editModal">Cancel</button>
           <button class="primary-button" type="submit">Save changes</button>
