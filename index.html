@@ -3,41 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>letsGraduate</title>
+    <title>Things & Plans</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <section id="authGate" class="auth-gate">
-      <div class="card auth-card">
-        <p class="eyebrow">LET'S GRADUATE</p>
-        <h1>Sign in to letsGraduate</h1>
-        <p class="auth-copy">Use your email to get a one-time sign-in link. Your tasks will sync across your devices.</p>
-        <form id="authForm" class="auth-form">
-          <label>
-            Email
-            <input id="authEmail" type="email" required autocomplete="email" placeholder="you@example.com" />
-          </label>
-          <button class="primary-button" type="submit">Send sign-in link</button>
-        </form>
-        <p id="authMessage" class="auth-message" role="status"></p>
-      </div>
-    </section>
-
-    <main id="appShell" class="app-shell hidden">
+    <main class="app-shell">
       <header class="topbar">
         <div>
-          <p class="eyebrow">STUDENT PLANNER</p>
-          <h1>letsGraduate</h1>
+          <p class="eyebrow">PERSONAL PLANNER</p>
+          <h1>Things & Plans</h1>
         </div>
-        <div class="account-controls">
-          <span id="userEmail" class="user-email"></span>
-          <button class="today-button" id="todayButton">Today</button>
-          <button class="settings-button" id="settingsButton">Settings</button>
-          <button class="sign-out-button" id="signOutButton">Sign out</button>
-        </div>
+        <button class="today-button" id="todayButton">Today</button>
       </header>
-
-      <div id="notificationArea" class="notification-area hidden" role="status"></div>
 
       <section class="layout">
         <aside class="sidebar">
@@ -59,10 +36,6 @@
                 Task
                 <input id="taskTitle" name="title" required placeholder="e.g. Finish lab report" />
               </label>
-              <label>
-                Notes <span class="muted">(optional)</span>
-                <textarea id="taskNotes" name="notes" rows="2" placeholder="Details, materials, or a link"></textarea>
-              </label>
               <div class="form-row">
                 <label>
                   Category
@@ -76,24 +49,16 @@
               </div>
               <div class="form-row">
                 <label>
-                  Soft due <span class="muted">(planning target)</span>
+                  Soft due
                   <input id="taskSoftDueDate" name="softDueDate" type="date" />
                 </label>
                 <label>
-                  Priority
-                  <select id="taskPriority" name="priority">
-                    <option value="low">Low</option>
-                    <option value="normal" selected>Normal</option>
-                    <option value="high">High</option>
-                  </select>
+                  Hard due
+                  <input id="taskHardDueDate" name="hardDueDate" type="date" />
                 </label>
               </div>
-              <label>
-                Hard due <span class="muted">(optional)</span>
-                <input id="taskHardDueDate" name="hardDueDate" type="date" />
-              </label>
               <button class="primary-button" type="submit">Add task</button>
-              <p class="form-help">Soft due helps pace the work; hard due is the actual deadline.</p>
+              <p class="form-help">Soft due is your target; hard due is the actual deadline. All dates are optional.</p>
             </form>
 
             <form id="eventForm" class="add-form hidden">
@@ -111,38 +76,12 @@
                   <input id="eventTime" name="time" type="time" />
                 </label>
               </div>
-              <div class="form-row">
-                <label>
-                  Repeat
-                  <select id="eventRecurrence" name="recurrence">
-                    <option value="none">Does not repeat</option>
-                    <option value="daily">Every day</option>
-                    <option value="weekdays">Every weekday</option>
-                    <option value="weekly">Every week</option>
-                    <option value="monthly">Every month</option>
-                  </select>
-                </label>
-                <label>
-                  Repeat until <span class="muted">(optional)</span>
-                  <input id="eventRecurrenceEnd" name="recurrenceEndDate" type="date" />
-                </label>
-              </div>
               <label>
                 Notes <span class="muted">(optional)</span>
                 <textarea id="eventNotes" name="notes" rows="2" placeholder="Room, link, or anything useful"></textarea>
               </label>
               <button class="primary-button" type="submit">Add event</button>
             </form>
-          </section>
-
-          <section class="card today-card">
-            <div class="section-heading">
-              <div>
-                <p class="eyebrow">FOCUS</p>
-                <h2>Things to do today <span class="count" id="todayCount">0</span></h2>
-              </div>
-            </div>
-            <div id="todayList" class="today-list"></div>
           </section>
 
           <section class="card task-card">
@@ -168,6 +107,7 @@
             </div>
             <div class="legend" aria-label="Calendar legend">
               <span><i class="legend-dot task-dot"></i> task</span>
+              <span><i class="legend-dot soft-due-dot"></i> soft due</span>
               <span><i class="legend-dot hard-due-dot"></i> hard due</span>
               <span><i class="legend-dot event-dot"></i> event</span>
             </div>
@@ -187,89 +127,24 @@
         <div class="task-content">
           <div class="task-title-row">
             <span class="task-title"></span>
-            <button class="edit-button" type="button">Edit</button>
             <button class="delete-button" aria-label="Delete task">×</button>
           </div>
           <div class="task-meta">
             <span class="category-pill"></span>
             <span class="task-schedule"></span>
-            <span class="priority-badge"></span>
+            <span class="soft-due-badge hidden"></span>
             <span class="hard-due-badge hidden"></span>
           </div>
-          <div class="task-notes hidden"></div>
           <div class="schedule-control hidden">
             <label>Plan <input class="plan-date-input" type="date" aria-label="Plan task date" /></label>
             <label>Soft <input class="soft-date-input" type="date" aria-label="Soft due date" /></label>
-            <label>Hard due <input class="hard-date-input" type="date" aria-label="Hard due date" /></label>
+            <label>Hard <input class="hard-date-input" type="date" aria-label="Hard due date" /></label>
             <button class="small-button">Save</button>
           </div>
         </div>
       </article>
     </template>
 
-    <div id="editModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
-      <form id="editTaskForm" class="card modal-card">
-        <div class="modal-header">
-          <div>
-            <p class="eyebrow">EDIT TASK</p>
-            <h2 id="editModalTitle">Update task</h2>
-          </div>
-          <button class="modal-close" type="button" data-close-modal="editModal" aria-label="Close">×</button>
-        </div>
-        <input id="editTaskId" type="hidden" />
-        <label>Task <input id="editTaskTitle" required /></label>
-        <label>Notes <textarea id="editTaskNotes" rows="3"></textarea></label>
-        <div class="form-row">
-          <label>Category <input id="editTaskCategory" list="categoryOptions" /></label>
-          <label>Priority
-            <select id="editTaskPriority">
-              <option value="low">Low</option>
-              <option value="normal">Normal</option>
-              <option value="high">High</option>
-            </select>
-          </label>
-        </div>
-        <div class="form-row">
-          <label>Plan to do <input id="editTaskDate" type="date" /></label>
-          <label>Soft due <input id="editTaskSoftDueDate" type="date" /></label>
-        </div>
-        <label>Hard due <input id="editTaskHardDueDate" type="date" /></label>
-        <div class="modal-actions">
-          <button class="secondary-button" type="button" data-close-modal="editModal">Cancel</button>
-          <button class="primary-button" type="submit">Save changes</button>
-        </div>
-      </form>
-    </div>
-
-    <div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
-      <form id="settingsForm" class="card modal-card">
-        <div class="modal-header">
-          <div>
-            <p class="eyebrow">ACCOUNT SETTINGS</p>
-            <h2 id="settingsModalTitle">Make it yours</h2>
-          </div>
-          <button class="modal-close" type="button" data-close-modal="settingsModal" aria-label="Close">×</button>
-        </div>
-        <div class="settings-grid">
-          <label>Task color <input id="settingAccent" type="color" /></label>
-          <label>Event color <input id="settingEvent" type="color" /></label>
-          <label>Hard due color <input id="settingHardDue" type="color" /></label>
-          <label>Page background <input id="settingBackground" type="color" /></label>
-        </div>
-        <label>Calendar density
-          <select id="settingDensity">
-            <option value="comfortable">Comfortable</option>
-            <option value="compact">Compact</option>
-          </select>
-        </label>
-        <div class="modal-actions">
-          <button class="secondary-button" type="button" data-close-modal="settingsModal">Cancel</button>
-          <button class="primary-button" type="submit">Save settings</button>
-        </div>
-      </form>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="app.js"></script>
   </body>
 </html>
