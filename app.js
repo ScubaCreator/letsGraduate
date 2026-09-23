@@ -1,14 +1,25 @@
 const STORAGE_KEY = "things-plans-v1";
+const SUPABASE_URL = "https://nfyutrshudnmkvcscobc.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_It99CB_ttgCo-ZEwiOR1gQ_y8eNkjwJ";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 const defaultCategories = ["School", "Work", "Personal", "Errands"];
 
 const state = {
-  items: loadItems(),
+  items: [],
+  user: null,
   currentMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
   selectedDate: formatDate(new Date()),
   activeTab: "task",
 };
 
 const els = {
+  authGate: document.querySelector("#authGate"),
+  appShell: document.querySelector("#appShell"),
+  authForm: document.querySelector("#authForm"),
+  authEmail: document.querySelector("#authEmail"),
+  authMessage: document.querySelector("#authMessage"),
+  userEmail: document.querySelector("#userEmail"),
+  signOutButton: document.querySelector("#signOutButton"),
   taskForm: document.querySelector("#taskForm"),
   eventForm: document.querySelector("#eventForm"),
   taskTitle: document.querySelector("#taskTitle"),
@@ -26,7 +37,7 @@ const els = {
   selectedDateMessage: document.querySelector("#selectedDateMessage"),
 };
 
-function loadItems() {
+function loadLocalItems() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
     return Array.isArray(saved) ? saved : [];
@@ -35,8 +46,103 @@ function loadItems() {
   }
 }
 
-function saveItems() {
+function saveItemsLocally() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.items));
+}
+
+function toCloudRow(item) {
+  return {
+    id: item.id,
+    user_id: state.user.id,
+    type: item.type,
+    title: item.title,
+    notes: item.notes || "",
+    category: item.category || "General",
+    date: item.date || null,
+    hard_due_date: item.hardDueDate || null,
+    time: item.time || null,
+    recurrence: item.recurrence || "none",
+    recurrence_end_date: item.recurrenceEndDate || null,
+    completed: Boolean(item.completed),
+    created_at: item.createdAt || Date.now(),
+  };
+}
+
+function fromCloudRow(row) {
+  return {
+    id: row.id,
+    type: row.type,
+    title: row.title,
+    notes: row.notes || "",
+    category: row.category || "General",
+    date: row.date || "",
+    hardDueDate: row.hard_due_date || "",
+    time: row.time || "",
+    recurrence: row.recurrence || "none",
+    recurrenceEndDate: row.recurrence_end_date || "",
+    completed: Boolean(row.completed),
+    createdAt: Number(row.created_at) || Date.now(),
+  };
+}
+
+async function saveItems() {
+  saveItemsLocally();
+  if (!state.user || !state.items.length) return;
+  const { error } = await supabaseClient.from("items").upsert(state.items.map(toCloudRow), { onConflict: "id" });
+  if (error) console.error("Could not sync planner items:", error.message);
+}
+
+async function deleteCloudItem(id) {
+  if (!state.user) return;
+  const { error } = await supabaseClient.from("items").delete().eq("id", id).eq("user_id", state.user.id);
+  if (error) console.error("Could not delete planner item:", error.message);
+}
+
+async function loadCloudItems(user) {
+  const { data, error } = await supabaseClient
+    .from("items")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+
+  const localItems = loadLocalItems();
+  if (!data.length && localItems.length) {
+    state.items = localItems;
+    await saveItems();
+    return;
+  }
+  state.items = (data || []).map(fromCloudRow);
+  saveItemsLocally();
+}
+
+function setAuthMessage(message, isError = false) {
+  els.authMessage.textContent = message;
+  els.authMessage.classList.toggle("error", isError);
+}
+
+async function showSignedInApp(session) {
+  state.user = session.user;
+  els.userEmail.textContent = session.user.email || "Signed in";
+  els.authGate.classList.add("hidden");
+  els.appShell.classList.remove("hidden");
+  try {
+    await loadCloudItems(session.user);
+    renderAll();
+  } catch (error) {
+    console.error(error);
+    setAuthMessage(`Could not load your planner: ${error.message}`, true);
+    els.authGate.classList.remove("hidden");
+    els.appShell.classList.add("hidden");
+  }
+}
+
+function showSignedOutApp() {
+  state.user = null;
+  state.items = [];
+  els.userEmail.textContent = "";
+  els.appShell.classList.add("hidden");
+  els.authGate.classList.remove("hidden");
 }
 
 function formatDate(date) {
@@ -146,7 +252,8 @@ function renderTasks() {
     });
     deleteButton.addEventListener("click", () => {
       state.items = state.items.filter((item) => item.id !== task.id);
-      saveItems();
+      saveItemsLocally();
+      void deleteCloudItem(task.id);
       renderAll();
     });
     els.taskList.appendChild(node);
@@ -344,6 +451,38 @@ document.querySelector("#todayButton").addEventListener("click", () => {
   selectDate(formatDate(today));
 });
 
-els.taskDate.value = state.selectedDate;
-els.eventDate.value = state.selectedDate;
-renderAll();
+els.authForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const email = els.authEmail.value.trim();
+  if (!email) return;
+  setAuthMessage("Sending your sign-in link…");
+  const { error } = await supabaseClient.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.href.split("#")[0] },
+  });
+  if (error) {
+    setAuthMessage(error.message, true);
+    return;
+  }
+  setAuthMessage("Check your email for the sign-in link.");
+});
+
+els.signOutButton.addEventListener("click", async () => {
+  await supabaseClient.auth.signOut();
+  showSignedOutApp();
+});
+
+supabaseClient.auth.onAuthStateChange((_event, session) => {
+  if (session) void showSignedInApp(session);
+  else showSignedOutApp();
+});
+
+(async function initializeAuth() {
+  const { data, error } = await supabaseClient.auth.getSession();
+  if (error) {
+    setAuthMessage(error.message, true);
+    return;
+  }
+  if (data.session) await showSignedInApp(data.session);
+  else showSignedOutApp();
+})();

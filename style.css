@@ -26,6 +26,17 @@ button { cursor: pointer; }
 
 .app-shell { max-width: 1480px; margin: 0 auto; padding: 34px 28px 44px; }
 .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 26px; }
+.auth-gate { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+.auth-card { width: min(100%, 390px); padding: 28px; }
+.auth-card h1 { margin: 5px 0 10px; font-size: 28px; }
+.auth-copy { margin-bottom: 20px; color: var(--muted); }
+.auth-form { display: grid; gap: 13px; }
+.auth-message { min-height: 20px; margin: 14px 0 0; color: var(--muted); font-size: 12px; }
+.auth-message.error { color: #b44848; }
+.account-controls { display: flex; align-items: center; gap: 8px; }
+.user-email { max-width: 190px; overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.sign-out-button { border: 1px solid #e2e4e9; border-radius: 7px; padding: 9px 10px; background: white; color: var(--muted); font-size: 12px; font-weight: 700; }
+.sign-out-button:hover { color: var(--ink); background: var(--soft); }
 .eyebrow { margin: 0 0 3px; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .13em; }
 h1, h2, p { margin-top: 0; }
 h1 { margin-bottom: 0; font-size: clamp(24px, 3vw, 34px); letter-spacing: -.04em; }
@@ -115,6 +126,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
   .calendar-panel { padding: 13px 8px; }
   .calendar-toolbar { align-items: flex-start; flex-direction: column; }
   .legend { align-self: flex-end; }
+  .topbar { align-items: flex-start; gap: 14px; }
+  .account-controls { flex-wrap: wrap; justify-content: flex-end; }
+  .user-email { max-width: 140px; }
   .day-cell { min-height: 82px; padding: 4px; }
   .calendar-item { padding: 3px; font-size: 10px; }
   .weekdays { font-size: 9px; }

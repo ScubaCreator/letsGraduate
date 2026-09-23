@@ -7,13 +7,33 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <main class="app-shell">
+    <section id="authGate" class="auth-gate">
+      <div class="card auth-card">
+        <p class="eyebrow">THINGS & PLANS</p>
+        <h1>Sign in to your planner</h1>
+        <p class="auth-copy">Use your email to get a one-time sign-in link. Your tasks will sync across your devices.</p>
+        <form id="authForm" class="auth-form">
+          <label>
+            Email
+            <input id="authEmail" type="email" required autocomplete="email" placeholder="you@example.com" />
+          </label>
+          <button class="primary-button" type="submit">Send sign-in link</button>
+        </form>
+        <p id="authMessage" class="auth-message" role="status"></p>
+      </div>
+    </section>
+
+    <main id="appShell" class="app-shell hidden">
       <header class="topbar">
         <div>
           <p class="eyebrow">PERSONAL PLANNER</p>
           <h1>Things & Plans</h1>
         </div>
-        <button class="today-button" id="todayButton">Today</button>
+        <div class="account-controls">
+          <span id="userEmail" class="user-email"></span>
+          <button class="today-button" id="todayButton">Today</button>
+          <button class="sign-out-button" id="signOutButton">Sign out</button>
+        </div>
       </header>
 
       <section class="layout">
@@ -157,6 +177,7 @@
       </article>
     </template>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="app.js"></script>
   </body>
 </html>
